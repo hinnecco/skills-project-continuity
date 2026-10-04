@@ -1,5 +1,5 @@
 ---
-protocol_version: 5
+protocol_version: 6
 ---
 # PROTOCOL - project continuity
 
@@ -16,7 +16,7 @@ Files (all in `.continuity/`): `CONTEXT.md` (stable orientation), `HANDOFF.md` (
 5. One principal writer at a time. Record child assignments. An ACTIVE record is advisory, not a process lock; verify the previous writers stopped or obtain explicit human coordination before takeover.
 6. Never write secrets (keys, tokens, passwords, .env values, private data) in any record. Refer to them by name only.
 7. Never delete, reset or clean up work to make things tidy. Never call unverified work "done".
-8. Unknown is written as `unknown`. Do not invent model names, approvals or test results.
+8. Unknown is written as `unknown`. Do not invent model names, approvals or test results. Timestamps come from the system clock (run `date '+%Y-%m-%d %H:%M %z'`), never from memory or guesswork; if you cannot run it, write `unknown`.
 9. Each fact lives in ONE file: orientation, scope, decisions, task board -> CONTEXT; current state and next action -> HANDOFF; events and evidence -> LOG. Other files point to it.
 10. After a handoff, stop. Never resume on your own, even if a quota window reset. Only the human, or the relay supervisor when the human enabled it (`relay.enabled` in config.json, see "Relay sessions"), starts the next session.
 
@@ -75,7 +75,7 @@ Order matters: each step saves the most valuable information first. If you are c
 
 `scripts/relay.py` is a supervisor the user runs in a terminal (`python3 .continuity/scripts/relay.py run`). It launches one AI CLI at a time in non-interactive mode with the `continue` prompt, waits for it to exit, reads HANDOFF, then launches the next available CLI. It only runs if the user set `relay.enabled: true`. It skips CLIs that are missing or whose last quota reading is at or below the threshold, never waits for or exploits a quota reset, never raises permissions, and stops on `complete`, `needs-human`, no available model, a stall (no recorded progress), or the session limit.
 
-If you were started by it (your prompt says so): you are non-interactive, so never ask questions; put them in HANDOFF section 6 and hand off with `needs-human`. Do the normal `continue`, checkpoint and quota rules. When quota reaches the threshold, hand off with `limit-near` and exit, so the supervisor can start the next model. If all approved work is done, hand off with `complete`. The supervisor appends RELAY entries to LOG; it does not edit other records.
+If you were started by it (your prompt says so): you are non-interactive, so never ask questions; put them in HANDOFF section 6 and hand off with `needs-human`. Do the normal `continue`, checkpoint and quota rules. When quota reaches the threshold, hand off with `limit-near` and exit, so the supervisor can start the next model. If all approved work is done, hand off with `complete`. A model that hands off with `model-switch` is not launched again right after, so a different model takes over. If a session ends with a usage-limit message in its log, the supervisor treats that model as at its limit for a while (it records an observation, not an estimate). The supervisor appends RELAY entries to LOG; it does not edit other records.
 
 ## Delegation (orchestrating cheaper models)
 

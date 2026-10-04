@@ -14,7 +14,7 @@ Exit codes: 0 complete | 2 usage/config error | 20 no model available (quota low
 missing CLI) | 30 needs a human | 40 stalled (no progress) | 50 session limit reached.
 Nothing here resets, buys or bypasses quota, and it never waits for a window to reset.
 """
-import argparse, hashlib, importlib.util, json, os, shutil, signal, subprocess, sys, time
+import argparse, hashlib, importlib.util, json, os, re, shutil, signal, subprocess, sys, time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 _spec = importlib.util.spec_from_file_location("quota_check", os.path.join(HERE, "quota_check.py"))
@@ -25,7 +25,8 @@ DEFAULT_PROMPT = (
     "You are continuing a shared multi-model project. Read .continuity/PROTOCOL.md and follow its "
     "`continue` procedure now. The relay supervisor started this session and verified that the "
     "previous writer's process has exited, so a stale ACTIVE status means an interrupted session: "
-    "follow RECOVERY. This session is non-interactive: do not ask questions. Work only inside the "
+    "follow RECOVERY. This session is non-interactive: do not ask questions. Take timestamps from "
+    "the system clock (`date`), never from memory. Work only inside the "
     "approved scope. Check quota as the protocol says. When quota reaches the threshold, run "
     "`handoff` (reason limit-near) and stop. When all approved work is done, run `handoff` with "
     "reason complete. If you need a human decision or approval, record the question in HANDOFF "
@@ -34,7 +35,8 @@ DEFAULT_PROMPT = (
 DEFAULTS = {"enabled": False, "models": [], "max_sessions": 6, "run_timeout_minutes": 120,
             "stall_limit": 2, "prompt": DEFAULT_PROMPT}
 STOP_REASONS = {"complete": 0, "needs-human": 30}
-QUOTA_REASONS = {"limit-near", "limit-hit"}
+SKIP_NEXT_REASONS = {"limit-near", "limit-hit", "model-switch"}  # the departing model is not relaunched right after
+LIMIT_RE = re.compile(r"(rate[ -]?limit|usage limit|limit (?:reached|exceeded|hit)|quota (?:exceeded|exhausted)|too many requests|resource_exhausted|\b429\b)", re.I)
 
 
 def now_str():
@@ -125,6 +127,39 @@ def pick(root, cfg, r, skip_name):
             continue
         return m, notes, resets
     return None, notes, resets
+
+
+def limit_message(logpath):
+    """Return the matched limit phrase from the tail of a session log, or None."""
+    try:
+        with open(logpath, "rb") as f:
+            f.seek(0, 2)
+            f.seek(max(0, f.tell() - 6000))
+            tail = f.read().decode("utf-8", "replace")
+    except OSError:
+        return None
+    m = LIMIT_RE.search(tail)
+    return m.group(0) if m else None
+
+
+def record_limit_observation(root, tool, phrase):
+    """The CLI itself said it hit a limit: record that as an observation (window 'relay_limit',
+    0% remaining) so the model is skipped until the reading goes stale (stale_after_minutes)."""
+    path = os.path.join(root, ".continuity", "quota", f"{tool}.json")
+    snap = qc.load_json(path, {})
+    if not isinstance(snap, dict) or not isinstance(snap.get("windows", {}), dict):
+        snap = {}
+    now = int(time.time())
+    snap.setdefault("windows", {})["relay_limit"] = {
+        "observed_at": now, "source": f"relay: limit message in session log ('{phrase}')",
+        "remaining_percent": 0.0, "used_percent": 100.0}
+    snap["observed_at"] = now
+    snap.setdefault("source", "relay")
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    tmp = path + f".{os.getpid()}.tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(snap, f, indent=2)
+    os.replace(tmp, path)
 
 
 def build_argv(m, r, root):
@@ -226,14 +261,22 @@ def cmd_run(root, cfg, r, args):
         outcome += f"; HANDOFF status={meta2.get('status', '?')} reason={meta2.get('reason', '?')}; log {os.path.relpath(logpath, root)}"
         print("  " + outcome)
         log_entry(root, [outcome])
+        clean = (not timed_out) and rc == 0 and meta2.get("status") == "PAUSED"
+        if not clean:
+            phrase = limit_message(logpath)
+            if phrase:
+                note = (f"limit message detected in the session log ('{phrase}'): {cand['name']} is treated as at its "
+                        f"limit for about {cfg.get('stale_after_minutes', 30)} min (observation, not an estimate)")
+                print("  " + note)
+                record_limit_observation(root, cand["tool"], phrase)
+                log_entry(root, [note])
         stalls = stalls + 1 if after == before else 0
         if stalls >= int(r["stall_limit"]):
             print(f"stop: no progress recorded in {stalls} consecutive sessions (stalled).")
             log_entry(root, [f"stopped: stalled after {stalls} sessions without progress"])
             return 40
-        clean = (not timed_out) and rc == 0 and meta2.get("status") == "PAUSED"
         # A model that hit its limit, crashed, hung or left ACTIVE is not asked again right away.
-        last_name = cand["name"] if (meta2.get("reason") in QUOTA_REASONS or not clean) else None
+        last_name = cand["name"] if (meta2.get("reason") in SKIP_NEXT_REASONS or not clean) else None
 
 
 def find_root(start):

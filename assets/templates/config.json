@@ -17,7 +17,7 @@
       {
         "name": "claude-code", "tool": "claude-code", "priority": 1, "enabled": true,
         "command": ["claude", "-p", "{prompt}",
-                    "--allowedTools", "Read,Edit,Write,Glob,Grep,Bash(git:*),Bash(python3 .continuity/scripts/quota_check.py:*)"]
+                    "--allowedTools", "Read,Edit,Write,Glob,Grep,Bash(git:*),Bash(python3 .continuity/scripts/quota_check.py:*),Bash(date:*)"]
       },
       {
         "name": "codex", "tool": "codex", "priority": 2, "enabled": true,

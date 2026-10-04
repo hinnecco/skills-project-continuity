@@ -74,12 +74,14 @@ python3 .continuity/scripts/relay.py run           # inicia o loop
 - Um modelo cortado por limite sem fazer handoff deixa o estado `ACTIVE`; o supervisor verifica que o processo terminou e o próximo modelo roda a recuperação, sem descartar nada.
 - Para quando: o trabalho aprovado termina (`complete`), falta uma decisão humana (`needs-human`), nenhum modelo está disponível (mostra quando a janela mais próxima renova), não há progresso em sessões seguidas, ou o limite de sessões é atingido. **Nunca espera nem explora a renovação da cota.**
 - Cada execução tem timeout, e processos travados são encerrados.
+- Um modelo que passa a vez com `model-switch` (ou que bateu no limite, caiu ou travou) não é relançado em seguida. Se o log de uma sessão que falhou contém uma mensagem de limite de uso, o modelo fica em "descanso" por `stale_after_minutes` (é uma observação registrada na janela `relay_limit`, não uma estimativa).
+- No modo headless o Claude Code provavelmente não alimenta a leitura de cota da statusline (não verificado); nesse caso o handoff acontece pelo corte por limite e pela recuperação, não pelo limiar.
 
 Comandos padrão (verificar na versão instalada; as flags mudam):
 
 | CLI | Comando |
 |---|---|
-| Claude Code | `claude -p "<prompt>" --allowedTools "Read,Edit,Write,Glob,Grep,Bash(git:*),Bash(python3 .continuity/scripts/quota_check.py:*)"` |
+| Claude Code | `claude -p "<prompt>" --allowedTools "Read,Edit,Write,Glob,Grep,Bash(git:*),Bash(python3 .continuity/scripts/quota_check.py:*),Bash(date:*)"` |
 | Codex | `codex exec --sandbox workspace-write "<prompt>"` |
 | Antigravity | `agy -p "<prompt>" --print-timeout 60m` |
 
@@ -117,8 +119,11 @@ Os testes automáticos usam CLIs falsos. Para exercitar o relay com Claude Code,
 
 ```bash
 bash scripts/smoke_test.sh            # cria ~/relay-teste com uma tarefa pequena aprovada
-THRESHOLD=95 bash scripts/smoke_test.sh ~/outro-dir   # limiar alto para forçar uma troca rápida
+TWO_TASKS=1 bash scripts/smoke_test.sh ~/relay-troca   # 2 tarefas: força uma troca real de modelo (model-switch)
+THRESHOLD=95 bash scripts/smoke_test.sh ~/outro-dir     # limiar configurável
 ```
+
+Com `TWO_TASKS=1` o primeiro modelo faz a T1 e passa a vez com `model-switch`; o relay então lança **outro** CLI para a T2. O script também confere as versões instaladas e se as flags dos comandos existem.
 
 O script mostra `status` e `--dry-run` e só executa o `run` (que usa a cota dos CLIs reais) depois da sua confirmação. No fim imprime o LOG, o HANDOFF e o resultado do teste da tarefa; se uma sessão falhar, veja `.continuity/relay/*.log` no projeto de teste.
 
@@ -127,7 +132,8 @@ O script mostra `status` e `--dry-run` e só executa o `run` (que usa a cota dos
 - A leitura de cota é automática apenas no Claude Code; nos demais depende de o modelo ou de você informar o número.
 - A cota é da conta, não do projeto: um handoff por uma janela vale para todos os projetos que a usam.
 - Os comandos headless e as flags de permissão vêm da documentação dos fornecedores em outubro de 2026 e precisam ser conferidos na sua versão. O Cursor não tem modo headless verificado e por isso não está no relay.
-- Os testes do relay usam CLIs falsos; o relay ainda não foi exercitado com os CLIs reais.
+- Os testes automáticos do relay usam CLIs falsos. O teste real com Claude Code (uma tarefa) funcionou; a troca real entre dois CLIs ainda precisa ser rodada com `TWO_TASKS=1`.
+- Os modelos não sabem a hora: o protocolo manda lerem `date`, e o comando do Claude libera `Bash(date:*)`.
 
 ## Histórico
 

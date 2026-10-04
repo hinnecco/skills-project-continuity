@@ -23,6 +23,8 @@ FAKE = textwrap.dedent('''
     with open(c / "LOG.md", "a") as f: f.write(f"\\n## fake {name} {action} {time.time()}\\n")
     (c / "calls.txt").open("a").write(name + "\\n")
     if action == "limit": sethandoff("PAUSED", "limit-near")
+    elif action == "switch": sethandoff("PAUSED", "model-switch")
+    elif action == "limitmsg": print("Error: usage limit reached, try again later"); sethandoff("ACTIVE", "limit-hit"); sys.exit(1)
     elif action == "complete": sethandoff("PAUSED", "complete")
     elif action == "human": sethandoff("PAUSED", "needs-human")
     elif action == "crash": sethandoff("ACTIVE", "limit-hit"); sys.exit(1)
@@ -161,6 +163,39 @@ class RelayTests(unittest.TestCase):
             self.assertEqual(run(root, force=True), 0)
             self.assertLess(time.time() - t, 20)
             self.assertEqual(calls(root), ["A", "B"])
+
+    def test_model_switch_skips_departing_model(self):
+        tmp, root = make_project({"A": ["switch"], "B": ["complete"]})
+        with tmp:
+            self.assertEqual(run(root, force=True), 0)
+            self.assertEqual(calls(root), ["A", "B"])
+
+    def test_limit_message_in_log_puts_model_on_cooldown(self):
+        tmp, root = make_project({"A": ["limitmsg"], "B": ["complete"]})
+        with tmp:
+            self.assertEqual(run(root, force=True), 0)
+            self.assertEqual(calls(root), ["A", "B"])
+            snap = json.loads((root / ".continuity" / "quota" / "a.json").read_text())
+            self.assertEqual(snap["windows"]["relay_limit"]["remaining_percent"], 0.0)
+            cfg, r = relay.load_relay(str(root))
+            self.assertEqual(relay.model_state(str(root), cfg, r["models"][0])[0], "quota-low")
+            # next run: A is still cooling down, so B goes first even though A has priority 1
+            (root / ".continuity" / "HANDOFF.md").write_text(HANDOFF)
+            (root / ".continuity" / "plan.json").write_text(json.dumps({"B": ["complete"]}))
+            self.assertEqual(run(root, force=True), 0)
+            self.assertEqual(calls(root), ["A", "B", "B"])
+
+    def test_crash_without_limit_message_records_no_observation(self):
+        tmp, root = make_project({"A": ["crash"], "B": ["complete"]})
+        with tmp:
+            self.assertEqual(run(root, force=True), 0)
+            self.assertFalse((root / ".continuity" / "quota" / "a.json").exists())
+
+    def test_relay_limit_window_counts_even_when_windows_are_listed(self):
+        snap = {"windows": {"relay_limit": {"remaining_percent": 0, "observed_at": time.time()},
+                            "five_hour": {"remaining_percent": 80, "observed_at": time.time()}}}
+        state, _ = relay.qc.assess(snap, {"windows": ["five_hour"]}, time.time())
+        self.assertEqual(state, "low")
 
     def test_dry_run_launches_nothing(self):
         tmp, root = make_project({"A": ["complete"]})

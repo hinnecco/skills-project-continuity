@@ -101,7 +101,10 @@ def assess(snap, cfg, now=None):
     except (ValueError, AttributeError):
         return "unknown", None
     low, resets, fresh = [], [], 0
-    for name in monitored or list(snap["windows"]):
+    names = list(monitored or snap["windows"])
+    if "relay_limit" in snap["windows"] and "relay_limit" not in names:
+        names.append("relay_limit")  # observation written by relay.py after a limit message
+    for name in names:
         w = snap["windows"].get(name)
         try:
             rem = number(w.get("remaining_percent"), 0, 100)
