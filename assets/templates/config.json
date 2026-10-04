@@ -16,7 +16,7 @@
     "models": [
       {
         "name": "claude-code", "tool": "claude-code", "priority": 1, "enabled": true,
-        "command": ["claude", "-p", "{prompt}", "--max-turns", "80",
+        "command": ["claude", "-p", "{prompt}",
                     "--allowedTools", "Read,Edit,Write,Glob,Grep,Bash(git:*),Bash(python3 .continuity/scripts/quota_check.py:*)"]
       },
       {

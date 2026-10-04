@@ -79,7 +79,7 @@ Comandos padrão (verificar na versão instalada; as flags mudam):
 
 | CLI | Comando |
 |---|---|
-| Claude Code | `claude -p "<prompt>" --max-turns 80 --allowedTools "Read,Edit,Write,Glob,Grep,Bash(git:*),Bash(python3 .continuity/scripts/quota_check.py:*)"` |
+| Claude Code | `claude -p "<prompt>" --allowedTools "Read,Edit,Write,Glob,Grep,Bash(git:*),Bash(python3 .continuity/scripts/quota_check.py:*)"` |
 | Codex | `codex exec --sandbox workspace-write "<prompt>"` |
 | Antigravity | `agy -p "<prompt>" --print-timeout 60m` |
 
