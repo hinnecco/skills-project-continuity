@@ -111,6 +111,17 @@ python3 -m unittest discover -s tests
 
 Python 3 com biblioteca padrão, sem dependências. O relay roda em macOS e Linux.
 
+### Teste com os CLIs reais
+
+Os testes automáticos usam CLIs falsos. Para exercitar o relay com Claude Code, Codex e Antigravity de verdade, rode no Terminal:
+
+```bash
+bash scripts/smoke_test.sh            # cria ~/relay-teste com uma tarefa pequena aprovada
+THRESHOLD=95 bash scripts/smoke_test.sh ~/outro-dir   # limiar alto para forçar uma troca rápida
+```
+
+O script mostra `status` e `--dry-run` e só executa o `run` (que usa a cota dos CLIs reais) depois da sua confirmação. No fim imprime o LOG, o HANDOFF e o resultado do teste da tarefa; se uma sessão falhar, veja `.continuity/relay/*.log` no projeto de teste.
+
 ## Limitações conhecidas
 
 - A leitura de cota é automática apenas no Claude Code; nos demais depende de o modelo ou de você informar o número.
