@@ -17,7 +17,7 @@
 # threshold in percent remaining.
 
 set -u
-SKILL="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SKILL="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"   # skill root (extras/scripts/..)/..
 TARGET="${1:-$HOME/relay-teste}"
 THRESHOLD="${THRESHOLD:-10}"
 TWO_TASKS="${TWO_TASKS:-0}"
@@ -45,17 +45,19 @@ echo
 
 mkdir -p "$TARGET/.continuity/scripts" && cd "$TARGET" || exit 2
 T="$SKILL/assets/templates"
-cp "$T"/PROTOCOL.md "$T"/CONTEXT.md "$T"/HANDOFF.md "$T"/LOG.md "$T"/QUOTA.md "$T"/config.json .continuity/
-cp "$SKILL"/scripts/quota_check.py "$SKILL"/scripts/relay.py "$SKILL"/scripts/claude_statusline.sh .continuity/scripts/
+cp "$T"/PROTOCOL.md "$T"/CONTEXT.md "$T"/HANDOFF.md "$T"/LOG.md "$T"/config.json .continuity/
+X="$SKILL/extras"
+cp "$X"/scripts/quota_check.py "$X"/scripts/relay.py "$X"/scripts/claude_statusline.sh .continuity/scripts/
 for f in AGENTS.md CLAUDE.md GEMINI.md; do cp "$T/pointer.md" "$f"; done
 printf '.continuity/quota/\n.continuity/relay/\n__pycache__/\n' > .gitignore
 command -v git >/dev/null && git init -q 2>/dev/null
 
-python3 - "$THRESHOLD" "$TWO_TASKS" <<'EOF'
+python3 - "$THRESHOLD" "$TWO_TASKS" "$X/templates/config.extras.json" <<'EOF'
 import json, sys
 thr, two = float(sys.argv[1]), sys.argv[2] == "1"
 cp = ".continuity/config.json"
 c = json.load(open(cp))
+c.update(json.load(open(sys.argv[3])))      # merge the extras settings (quota, delegation, relay)
 c["handoff_threshold_percent"] = thr
 c["relay"]["enabled"] = True
 for m in c["relay"]["models"]:               # let Claude run the project's unit tests

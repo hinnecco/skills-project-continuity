@@ -24,7 +24,7 @@ A model cannot see its own quota by itself. It only knows what a tool exposes: a
 
 The user changes it by asking ("set the threshold to 15%", "only watch the 5-hour window") or by editing the file. The model that applies the change logs a DECISION entry.
 
-## Where readings come from (details in `assets/templates/QUOTA.md`)
+## Where readings come from (details in `extras/docs/quota-per-tool.md`)
 
 | Tool | Readable source | How it reaches the file |
 |---|---|---|
