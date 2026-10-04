@@ -1,5 +1,7 @@
 # project-continuity
 
+**Português** | [English](README.en.md)
+
 Uma skill para trabalhar em **um mesmo projeto com modelos de IA diferentes** (Claude Code, Codex, Antigravity, Gemini CLI, Cursor) sem perder continuidade. O estado do projeto fica em arquivos dentro do repositório; o histórico do chat é só complemento. Quando um modelo vai parar (cota no limiar, troca de ferramenta, fim do trabalho), ele faz o handoff e o próximo assume exatamente de onde o anterior parou.
 
 O protocolo está em inglês para que modelos de qualquer fornecedor o sigam do mesmo jeito; os registros do projeto ficam no idioma do projeto.
