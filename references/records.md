@@ -1,48 +1,31 @@
 # Record contracts
 
-Adopt existing equivalent paths/fields. Two main records and links to the project's existing ledger are sufficient; do not add redundant history files.
+Templates are in `assets/templates/` (CONTEXT.md, HANDOFF.md, LOG.md, config.json, QUOTA.md) with filled examples in `assets/templates/examples/`. Adopt existing equivalent paths and ledgers if the project already has them; reference them instead of creating competing ones.
 
-## CONTEXT.md
+## One fact, one file
 
-Start with instructions addressed to any incoming executor:
+| Fact | Lives in |
+|---|---|
+| Purpose, constraints, approved scope, task board, decisions | CONTEXT.md |
+| Status, owner, next action, working tree, verification, watch-outs | HANDOFF.md |
+| Events, takeovers, checkpoints, evidence, quota readings | LOG.md |
+| Quota threshold, windows, staleness | config.json |
+| Latest quota reading per tool (local state, gitignored) | quota/<tool>.json |
 
-> This project is shared across AI models and human contributors. Read this context before acting, preserve prior work and authorization boundaries, and document your contribution at activity boundaries and before interruption. Use the shared continuity protocol; never assume chat history is complete. Consult the authoritative handoff and current task ledger. Coordinate mutation ownership before editing.
+Other files point to the owner of a fact instead of copying it.
 
-Maintain a compact current summary:
+## Size and rotation
 
-- Project purpose, confirmed root, scope and constraints.
-- Approved work versus proposals, with source/date of human approval.
-- Current phase/task and authoritative plan, ledger and handoff paths.
-- Executor/session/model/provider (unknown where unavailable), ownership and child assignments.
-- Completed, partial, blocked and pending work; verified evidence references.
-- Configuration decisions relevant to continuation, quota threshold and last observation (historical, not current).
-- Exact next action.
+- CONTEXT.md: stable orientation, about 150 lines max, no session history.
+- HANDOFF.md: overwritten each handoff, about 80 lines max, sections in priority order (next action first) so a cut-off leaves the most important part saved.
+- LOG.md: append-only. When over 300 lines, at handoff move all but the last 50 lines to `archive/LOG-YYYY-MM.md`.
 
-Append chronological contribution entries with timestamp/timezone, executor identity/role, activity/status, files or commits, verification command/result/revision, decisions and rationale, unresolved concerns and next action. Distinguish implementation, review and documentation. Update summaries without erasing earlier entries. Separate child contributions by identity, integrated by the principal.
+## Required fields
 
-## HANDOFF.md (or existing authoritative equivalent)
+HANDOFF front matter: `status` (ACTIVE|PAUSED), `owner`, `updated` (with timezone), `reason`, `quota`, `next_model_hint`. Body: sections 1-7 as in the template. A paused checkpoint is not a completion report; a model name is not proof of capability; quota history is not proof of present capacity.
 
-Minimum checkpoint fields:
+LOG entry header: `## <timestamp tz> | <tool (model or unknown)> | <task id> | <TYPE>` then done / files / evidence (command, result, revision) / quota / next. Types: INIT, TAKEOVER, CHECKPOINT, DECISION, HANDOFF, RECOVERED.
 
-- Time/timezone; author; pause reason; measured quota/window/observation time or “unavailable.”
-- Root; repository branch/revision if applicable; current changed/untracked work or non-Git equivalents.
-- Human approval boundaries and binding restrictions.
-- Current activity, completed tasks, partial files, failures and evidence paths.
-- Tests/reviews actually completed and important checks not run.
-- Provisioned dependencies/assets and reproducibility metadata when relevant; no credentials or private payloads.
-- Active operations/children/processes and ownership; verified status versus last known state. PID alone is not process identity.
-- Recovery needs and the first concrete action for the next executor, followed by pending tasks.
+## Safety
 
-A paused checkpoint is not a completion report. Quota history is not proof of present capacity. Model names are not proof of capability, price or availability.
-
-## Task ledger
-
-Reuse the project's existing ledger. Record task status, implementation/review identity, commits or file snapshots, test evidence, findings/fix state, decisions and next action. It is the detailed execution record; CONTEXT is orientation and HANDOFF is takeover state. Link between them rather than copying the full ledger.
-
-## Optional runtime adapter
-
-A short entry point may say:
-
-> Before continuing this shared project, read CONTEXT.md, then its authoritative handoff and current ledger. Follow project-continuity in the requested mode, or read its SKILL.md by the recorded path. Keep progress documented and preserve approval boundaries.
-
-Adapt discovery syntax to actual runtime support. No provider-specific file is required. Do not overwrite existing instructions or install into global skill directories without authorization.
+No secrets, credentials, personal media or private raw output in any record; refer to them by name. Preserve originals and user work; never clean, reset or delete to produce a tidy checkpoint. Ownership is advisory, not a process lock; the user's word releases an ACTIVE status.

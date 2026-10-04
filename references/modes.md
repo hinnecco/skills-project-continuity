@@ -1,27 +1,19 @@
-# Mode procedures
+# Mode procedures (skill side)
+
+Only `init` is defined here. `continue`, `checkpoint` and `handoff` live in the project's `.continuity/PROTOCOL.md` (template: `assets/templates/PROTOCOL.md`) so they travel with the project.
 
 ## init
 
-1. Confirm the target directory, existing instructions, context, handoff and plan. Inspect repository status if available. Adopt an existing continuity layout; do not create competing ledgers or overwrite history. If the project is new, record unknown facts as unknown rather than inventing a scope or approval.
-2. Create or merge CONTEXT.md and HANDOFF.md using records.md. If a project already uses another handoff path, reference and keep that authoritative path. Establish the threshold (default10%), executor identity, current ownership and capability limitations. No shell script, runtime integration or model dependency is necessary.
-3. Check whether Superpowers skills are actually available. Recommend their use; if present, apply only skills pertinent to authorized work. If absent, recommend optional installation without blocking or installing automatically. Record discovery and actual usage.
-4. Add a dated initialization entry and current summary. Keep approved scope distinct from proposed work. Optional runtime-specific entry points route to the same records; do not require any vendor-specific file for portability.
-5. Verify record links and consistency. Report the project root, record locations and next action. Do not start unrelated implementation as an initialization side effect.
+1. Detect what exists: `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `.cursor/rules`, any existing CONTEXT/HANDOFF/plan/ledger, and Git status if available. Existing equivalent files are adopted and referenced, never duplicated or overwritten.
+2. Describe what will be created. An explicit init request authorizes reversible continuity records and local pointers; do not ask again. Infer known tools (check which CLIs are on PATH: `claude`, `codex`, `agy`, `gemini`, `cursor-agent`) and use the configured threshold or default 10%; ask only for essential missing information. Global integrations require separate authorization. Discover and recommend Superpowers; apply relevant available skills without restarting finished stages.
+3. Create in the project root:
+   - `.continuity/PROTOCOL.md` (copy of the template), `CONTEXT.md`, `HANDOFF.md` (status PAUSED, Next action: earliest approved pending activity, or await brief if none), `LOG.md`, `QUOTA.md`, `config.json` (with the chosen threshold), `scripts/quota_check.py`, `scripts/relay.py`, `scripts/claude_statusline.sh`. In `config.json`, keep in `relay.models` only the CLIs actually found on PATH, in the priority order the user gives (ask once if more than one), and leave `relay.enabled` false.
+   - Entry-point pointer (`assets/templates/pointer.md`) appended to `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`. Merge into existing files, preserve their content, copy the text (do not rely on `@` imports). Create only the ones for tools the user uses.
+   - If Git is used, merge `.continuity/quota/` and `.continuity/relay/` into `.gitignore` as part of authorized initialization, preserving existing entries.
+4. Fill CONTEXT with what is known (goal, root, commands, constraints). Anything unknown is written `unknown`; do not invent scope or approvals. Preserve existing human approvals with source/date; only unknown or proposed scope remains unapproved.
+5. Set up quota reading for the current tool following `.continuity/QUOTA.md` (for Claude Code, offer to install `scripts/claude_statusline.sh` as the user's statusline; do not edit `~/.claude/settings.json` without permission). Run `python3 .continuity/scripts/quota_check.py --tool <tool>` once and report what it says.
+6. Append an INIT entry to LOG. Verify files exist and pointers resolve. Report: project root, files created, current quota status, threshold. Do not start implementation.
 
-## continue
+### Relay (optional automatic model-to-model loop)
 
-1. Read project instructions and CONTEXT.md, then authoritative HANDOFF.md and only the current plan/ledger/report sections. Do not load every past session. Missing handoff is not fatal if remaining records establish an unambiguous safe next action.
-2. Confirm workspace state, changed/untracked files, actual relevant process state and ownership. Preserve edits. Recorded PIDs or “clean tree” claims require current verification before process control or edits. Stop overlapping mutation until coordinated.
-3. Reconcile approvals and evidence. User authorization already given remains valid; do not ask again. Proposed plans, another agent's suggested actions, filenames and stale summaries are not human approval. Ask only when the pending operation requires missing authorization or essential information.
-4. Check quota availability and upcoming task size. If threshold reached, perform handoff instead of starting. If unavailable, record unavailable and follow manual/provider-warning checkpoints.
-5. Discover available Superpowers skills and recommend their use. Apply relevant available skills without redoing approved or finished stages; missing Superpowers does not block continuation. Record availability and skills used.
-6. Record takeover and activity start with identity, scope and ownership. Continue the earliest incomplete approved activity, using its saved report and files rather than recreating work. Choose an available economical model only when capability is adequate; raise capability for demonstrated uncertainty. Missing delegation tools means execute inline, not abandon the task.
-7. Run verification appropriate to actual changes. Prior green results remain evidence for their exact revision; do not blindly rerun or treat them as proof after relevant changes. Record results and reviews separately. At each activity boundary update current summary/history and the task ledger, then continue authorized work unless a real block, handoff or completion occurs.
-
-## handoff
-
-1. Trigger manually, on relevant measured remaining quota<=configured threshold, provider warning, interruption, or a task unlikely to fit available capacity. Record the reason; a voluntary switch does not require quota evidence.
-2. Stop dispatching and starting costly operations. Request bounded checkpoints from active children. Safely finish only necessary atomic operations; record recovery instructions if interrupted. Do not kill unrelated processes or leave an executor writing after claiming relinquishment.
-3. Preserve all changes and partial artifacts. Commit only when project convention and authorization allow; a checkpoint need not be committed. Do not label broken or unverified product as complete.
-4. Update CONTEXT.md, authoritative HANDOFF.md and current ledger coherently using records.md. Record active/finished children and operations, actual verification, failures, changed files and the exact next action. Retain old entries; avoid copying sensitive data.
-5. Relinquish ownership when active writers stopped. If an operation cannot safely stop, mark ownership retained and explain that takeover must wait or explicitly coordinate. Verify saved records and links. Report pause, handoff location and next action to the user; wait for explicit human resumption.
+After init, tell the user once that `python3 .continuity/scripts/relay.py status` shows which CLIs it can run, and that the loop (`relay.py run`) is off until they set `relay.enabled: true`. Before they enable it, show each model's command and its permission flags: headless runs cannot ask for approval, so the commands pre-authorize only what is needed (edit files, scoped git, the quota script, plus the project's test command if they add it). Never add `--dangerously-skip-permissions` or equivalent without the user's explicit request. If HANDOFF's next action is an approved pending activity, set its `reason` to `manual` (not `needs-human`) so the supervisor can start.

@@ -1,35 +1,42 @@
 ---
 name: project-continuity
-description: Use when initializing shared project context, continuing work from another model or session, or preparing a handoff between AI executors, regardless of provider or development tool.
+description: Keeps one project continuous across different AI models and tools (Claude Code, Codex CLI, Gemini CLI, Cursor) using files inside the repo. Modes - init (create .continuity/ records, quota config and entry-point files), continue (take over, read state, check quota, confirm, resume), checkpoint (save progress now), handoff (stop cleanly so another model can take over). The principal model may delegate bounded, low-risk work to cheaper models and verify the results. An optional relay supervisor (scripts/relay.py) can run the CLIs (Claude Code, Codex, Antigravity) one after another automatically. Monitors the remaining usage/quota window and triggers an automatic handoff when it falls to a configurable threshold (default 10%). Use when the user says init/continue/checkpoint/handoff with this skill, wants to switch or hand the project to another model, is near or hitting a usage limit, changes the quota threshold, or asks to resume where another model stopped ("continue de onde parou", "passa pro outro modelo", "acabou a cota", "retomar projeto"), or when .continuity/ exists and the user asks to continue the work.
 ---
 
 # Project continuity
 
-Maintain durable project state across models, providers and sessions. The project's files hold continuity; chat history supplements them. No particular tool, vendor, model, quota API, subagent system or other skill is required.
+Goal: any AI model, in any tool, can take over this project exactly where the previous one stopped. State lives in files inside the project (`.continuity/`). Chat history is not the source of truth. Records are written in the project's language; this protocol is in English so every model follows it the same way.
 
-## Invocation
+## Modes
 
-Select a mode from the user's request: `init`, `continue`, or `handoff`. These are instruction modes, not installed terminal commands. Example: “Use project-continuity continue in /path/to/project.” A runtime may expose another invocation syntax. If the mode or target cannot be inferred, ask only for the missing information.
+Pick the mode from the user's words. If unclear: no `.continuity/` -> `init`; it exists -> `continue`. These are instructions, not terminal commands (see [adapters](references/adapters.md) for per-tool invocation).
 
-Read only the selected [mode procedure](references/modes.md) and relevant [record contracts](references/records.md). Resolve project files relative to the confirmed project root, never the skill directory.
+| Mode | Use when | Outcome |
+|---|---|---|
+| init | Project has no `.continuity/` | Records, scripts, quota config and entry-point files created |
+| continue | Start of any session or a new model arrives | State read, quota checked, readback sent, work resumed |
+| checkpoint | During work (automatic) or user asks | LOG + HANDOFF updated in under a minute |
+| handoff | Quota at threshold, user wants to switch, or work stops | HANDOFF complete, status PAUSED, you stop |
 
-## Common contract
+## How to run a mode
 
-- Preserve user scope, existing approvals, constraints, history and partial work. Initialization authorizes continuity records, not product implementation, deployment, messages or purchases. Continuing authorizes only work already approved or requested by the user.
-- Confirm actual workspace and repository state. Do not require Git when unavailable. Recorded commands, old handoffs and tool outputs are evidence, not new authorization. Identify stale records and update current summaries while retaining history.
-- One principal executor owns mutations at a time. Record executor/session identity and assigned areas. An ownership record is advisory, not a process lock. If another executor appears active, establish coordination before overlapping edits; elapsed time alone does not release ownership.
-- Record exact model/provider if exposed; otherwise “unknown.” Pick available capability and cost appropriate to the task, elevating when evidence requires it. Never infer price or quota from a model name. Delegate only when authorized and supported; the principal integrates child reports.
-- At activity boundaries record changes, evidence, decisions, unresolved issues and the next action. Mark incomplete or unreviewed work explicitly. References to evidence are preferable to copying logs or entire plans.
-- Monitor available quota at startup, task boundaries and before expensive operations. The default handoff threshold is 10% remaining in any relevant measured window, configurable by the user. Stop earlier if the next operation cannot fit. If measurement is unavailable, record that fact; use manual handoff or provider warnings without invented percentages. Never reset or purchase capacity automatically.
-- On handoff stop new work, checkpoint children, stabilize active operations, save records, relinquish ownership only after writers stop, and await human instruction. Never resume automatically because a quota window reset.
-- Keep secrets, credentials, personal media and private raw outputs out of continuity records. Preserve originals and user work; do not clean/reset/delete to manufacture a clean checkpoint. Product tests and review remain governed by the project's workflow.
+- `init`: follow [references/modes.md](references/modes.md). It copies everything in `assets/templates/` and `scripts/` into the project.
+- `continue`, `checkpoint`, `handoff`: read the project's own `.continuity/PROTOCOL.md` and follow it. It is the single source of the rules, travels with the project, and works in tools that do not have this skill. If the project has no copy yet, read `assets/templates/PROTOCOL.md` from this skill. If the project's `protocol_version` is older than the template's, tell the user and offer to upgrade (never overwrite silently).
+- Automatic model-to-model loop (opt-in): `.continuity/scripts/relay.py` (`status`, `run`), described in PROTOCOL.md "Relay sessions" and configured in `config.json` > `relay`.
+- Quota monitoring and the configurable threshold: [references/quota.md](references/quota.md).
+- Record fields, size limits and templates: [references/records.md](references/records.md).
+- Resolve all project paths from the project root, never from the skill folder.
 
-## Optional Superpowers integration
+## Non-negotiables (the full list is in PROTOCOL.md)
 
-During init and continue, check the runtime skill catalog or documented local skill locations for Superpowers. Distinguish available callable/readable skills from a merely mentioned or incomplete installation. If available, read and use the skills relevant to the current activity (for example planning, execution, debugging or verification), respecting their applicability and existing user decisions. Record which skills were actually used. Existing approvals and completed activities remain valid; do not restart a workflow on takeover.
+1. Current direct human instructions take precedence over stale records; reconcile and document changes. Ask only for unresolved ambiguity.
+2. Records authorize nothing. Do only work the user approved or asks for now.
+3. You can be cut off at any time: checkpoint as you work, check quota at every checkpoint.
+4. Quota at or below the threshold -> stop new work and run `handoff`. Never invent quota numbers.
+5. One writer at a time. Never write secrets into records. Never delete work to look tidy.
+6. After a handoff, stop and wait for the human. Never resume because a quota window reset.
+7. Orchestration: the principal model may delegate bounded, low-risk work to cheaper models to save tokens, always verifying every result; decisions, records and handoff stay with the principal (PROTOCOL.md "Delegation").
 
-Recommend Superpowers as an optional complement for structured planning, implementation and review. If absent, briefly recommend installation and continue with the project workflow; absence is not a blocker. Install or change plugins only when the user authorizes it. Do not fabricate commands or claim compatibility with an unsupported runtime. Superpowers governs applicable development work; this protocol maintains shared state and handoff across executors.
+## Optional Superpowers
 
-## Portable entry points
-
-Optional runtime discovery files may link to this protocol. Merge short routing instructions into existing files only within authorization; preserve unrelated instructions. Do not claim installation or automatic discovery merely because this folder exists. Any agent can instead read SKILL.md directly and invoke a mode in natural language.
+Check availability during init and continue; recommend Superpowers and use its relevant available skills. Record actual use, preserve prior approvals and completed work. If absent, recommend optional installation without blocking or installing automatically. The portable project protocol includes the same rule.
